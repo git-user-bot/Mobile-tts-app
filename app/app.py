@@ -19,7 +19,13 @@ VOICES = {
         "en-IN-NehaNeural"
     ),
     "🇮🇳 Hindi (India) - Swara (Neural) [Natural Hindi]": "hi-IN-SwaraNeural",
+    "🇮🇳 Hindi (India) - Madhur (Neural) [Deep Hindi]": "hi-IN-MadhurNeural",
 }
+
+
+def contains_devanagari(text: str) -> bool:
+    """Checks if the text contains Devanagari (Hindi) script characters."""
+    return any("\u0900" <= char <= "\u097f" for char in text)
 
 
 async def generate_speech(
@@ -27,7 +33,17 @@ async def generate_speech(
 ):
     if not text.strip():
         return None
+
     voice_id = VOICES.get(voice_key, "en-US-AvaNeural")
+
+    # Script format validation to avoid empty stream error
+    if contains_devanagari(text) and not voice_id.startswith("hi-"):
+        st.error(
+            "⚠️ Selected voice does not support Devanagari script. "
+            "Please select a Hindi voice (Swara or Madhur) or use Latin/Hinglish text."
+        )
+        return None
+
     rate_str = f"{rate_offset:+d}%" if rate_offset != 0 else "+0%"
     pitch_str = f"{pitch_offset:+d}Hz" if pitch_offset != 0 else "+0Hz"
     volume_str = f"{volume_offset:+d}%" if volume_offset != 0 else "+0%"
@@ -56,8 +72,10 @@ st.write(
 )
 
 text_input = st.text_area(
-    "Script Input", placeholder="Type or paste your video script paragraph here..."
+    "Script Input",
+    placeholder="Type or paste your video script paragraph here...",
 )
+
 voice_choice = st.selectbox("Select Voice", list(VOICES.keys()))
 
 with st.expander("Advanced Voice Controls (Speed / Pitch / Volume)"):
@@ -65,23 +83,21 @@ with st.expander("Advanced Voice Controls (Speed / Pitch / Volume)"):
     pitch = st.slider("Pitch (Hz)", -20, 20, 0, 1)
     volume = st.slider("Volume (%)", -50, 50, 0, 5)
 
-    if st.button("🚀 Generate Voiceover", type="primary"):
-        if text_input:
-            with st.spinner("Synthesizing audio..."):
-                audio_file = asyncio.run(
-                    generate_speech(
-                        text_input, voice_choice, rate, pitch, volume
-                    )
+if st.button("🚀 Generate Voiceover", type="primary"):
+    if text_input:
+        with st.spinner("Synthesizing audio..."):
+            audio_file = asyncio.run(
+                generate_speech(text_input, voice_choice, rate, pitch, volume)
+            )
+        if audio_file:
+            st.audio(audio_file, format="audio/mp3")
+            with open(audio_file, "rb") as f:
+                st.download_button(
+                    "📥 Download MP3 File",
+                    f,
+                    file_name="voiceover.mp3",
+                    mime="audio/mp3",
                 )
-            if audio_file:
-                st.audio(audio_file, format="audio/mp3")
-                with open(audio_file, "rb") as f:
-                    st.download_button(
-                        "📥 Download MP3 File",
-                        f,
-                        file_name="voiceover.mp3",
-                        mime="audio/mp3",
-                    )
-        else:
-            st.warning("Please enter some text first.")
-                                                                                                                                                                                                                                                                                                                                                                                            
+    else:
+        st.warning("Please enter some text first.")
+        
